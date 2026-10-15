@@ -1,5 +1,14 @@
 import mongoose from "mongoose";
 
+const proctoringFlagSchema = new mongoose.Schema({
+  eventType: String,
+  severity: { type: String, enum: ["info", "review"], default: "review" },
+  message: String,
+  source: { type: String, enum: ["browser", "ai"], default: "browser" },
+  questionIndex: Number,
+  createdAt: { type: Date, default: Date.now },
+}, { _id: false });
+
 const questionsSchema = new mongoose.Schema({
      question: String,
   focus: String,
@@ -64,6 +73,11 @@ const interviewSchema = new mongoose.Schema({
     coachingReport: {
       type: mongoose.Schema.Types.Mixed,
       default: null,
+    },
+    proctoring: {
+      enabled: { type: Boolean, default: false },
+      startedAt: { type: Date, default: null },
+      flags: { type: [proctoringFlagSchema], default: [] },
     },
     questions:[questionsSchema],
 

@@ -349,6 +349,42 @@ const normalizeProgressiveHints = (result) => {
   return hints;
 };
 
+const proctorSignalMessages = {
+  camera_started: { severity: "info", message: "Camera integrity monitoring was started." },
+  tab_hidden: { severity: "review", message: "The interview tab was moved to the background. Review if this was unexpected." },
+  window_blur: { severity: "review", message: "The interview window lost focus. Review if this was unexpected." },
+  focus_mode_exited: { severity: "review", message: "Focus mode was exited during the interview. Review if this was unexpected." },
+  camera_stopped: { severity: "review", message: "Camera monitoring stopped before the interview ended. Review if this was unexpected." },
+};
+
+const normalizeProctorObservations = (result) => {
+  const allowedTypes = new Set(["no_face", "multiple_people", "visible_phone", "visible_secondary_screen"]);
+  const labels = {
+    no_face: "No face is clearly visible in the camera frame.",
+    multiple_people: "More than one person appears to be visible in the camera frame.",
+    visible_phone: "A phone-like device appears to be visible in the camera frame.",
+    visible_secondary_screen: "A secondary screen or display appears to be visible in the camera frame.",
+  };
+
+  if (!Array.isArray(result?.observations)) return [];
+
+  return result.observations
+    .filter((item) => allowedTypes.has(item?.type) && Number(item?.confidence) >= 0.65)
+    .slice(0, 3)
+    .map((item) => ({
+      eventType: item.type,
+      severity: "review",
+      source: "ai",
+      message: String(item?.message || labels[item.type]).trim().slice(0, 240) || labels[item.type],
+    }));
+};
+
+const appendProctorFlag = (interview, flag) => {
+  const existingFlags = Array.isArray(interview.proctoring?.flags) ? interview.proctoring.flags : [];
+  interview.proctoring = interview.proctoring || {};
+  interview.proctoring.flags = [...existingFlags, { ...flag, createdAt: new Date() }].slice(-100);
+};
+
 const buildTopicAnalysis = (questions) => {
   const grouped = questions.reduce((groups, question) => {
     const topic = question.topic || "generic";
@@ -767,6 +803,90 @@ Use only facts supported by the question and supplied context. Make each hint pr
   } catch (error) {
     console.error("Failed to provide progressive hint:", error.message);
     return res.status(500).json({ message: "Unable to prepare an AI hint right now. Please try again." });
+  }
+};
+
+
+export const recordProctoringEvent = async (req, res) => {
+  try {
+    const { interviewId, questionIndex, eventType, frame } = req.body;
+    const interview = await Interview.findById(interviewId);
+
+    if (!interview || !interview.questions?.[questionIndex]) {
+      return res.status(404).json({ message: "Interview question not found." });
+    }
+    if (interview.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "You cannot monitor another user's interview." });
+    }
+    if (interview.status === "completed") {
+      return res.status(409).json({ message: "Integrity monitoring is available only while an interview is in progress." });
+    }
+
+    const safeQuestionIndex = Number(questionIndex);
+    if (!Number.isInteger(safeQuestionIndex) || safeQuestionIndex < 0 || safeQuestionIndex >= interview.questions.length) {
+      return res.status(400).json({ message: "Invalid interview question index." });
+    }
+
+    const browserSignal = proctorSignalMessages[eventType];
+    if (browserSignal) {
+      interview.proctoring = interview.proctoring || {};
+      if (eventType === "camera_started") {
+        interview.proctoring.enabled = true;
+        interview.proctoring.startedAt = interview.proctoring.startedAt || new Date();
+      }
+      appendProctorFlag(interview, { eventType, source: "browser", questionIndex: safeQuestionIndex, ...browserSignal });
+      await interview.save();
+      return res.json({ flags: [browserSignal], reviewCount: interview.proctoring.flags.filter((flag) => flag.severity === "review").length });
+    }
+
+    const safeFrame = typeof frame === "string"
+      && /^data:image\/(png|jpeg);base64,/i.test(frame)
+      && frame.length <= 900_000
+      ? frame
+      : "";
+    if (!safeFrame) {
+      return res.status(400).json({ message: "A valid camera frame is required for an AI visual integrity check." });
+    }
+
+    const question = interview.questions[safeQuestionIndex];
+    const messages = [
+      {
+        role: "system",
+        content: `You are an integrity-review assistant for a voluntary mock interview. Analyze only directly visible scene facts in this single webcam frame. Do not identify the person, estimate age, gender, race, emotion, gaze direction, disability, or intent. Never claim cheating. Only report a concern when it is clearly visible; uncertainty should produce no observation. A normal laptop, headset, glasses, background object, or one candidate alone is not a concern.
+
+Return only valid JSON in exactly this format:
+{"observations":[{"type":"no_face|multiple_people|visible_phone|visible_secondary_screen","confidence":0.0,"message":"short neutral observable description"}]}`,
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: `Current question topic: ${questionTopicLabels[question.topic] || question.topic || "General"}. Inspect this webcam frame for the allowed, clearly observable integrity-review signals only.` },
+          { type: "image_url", image_url: { url: safeFrame } },
+        ],
+      },
+    ];
+
+    let flags;
+    try {
+      flags = normalizeProctorObservations(parseAiJson(await askAi(messages)));
+    } catch (error) {
+      console.error("AI visual integrity check failed:", error.message);
+      return res.status(503).json({ message: "AI visual review is temporarily unavailable. Browser integrity signals remain active." });
+    }
+
+    interview.proctoring = interview.proctoring || {};
+    interview.proctoring.enabled = true;
+    interview.proctoring.startedAt = interview.proctoring.startedAt || new Date();
+    flags.forEach((flag) => appendProctorFlag(interview, { ...flag, questionIndex: safeQuestionIndex }));
+    await interview.save();
+
+    return res.json({
+      flags,
+      reviewCount: interview.proctoring.flags.filter((flag) => flag.severity === "review").length,
+    });
+  } catch (error) {
+    console.error("Failed to record proctoring event:", error.message);
+    return res.status(500).json({ message: "Unable to record the integrity check right now." });
   }
 };
 

@@ -10,6 +10,7 @@ import Timer from "./Timer";
 import CodeEditor from "./CodeEditor";
 import { codingLanguages, defaultLanguageForTopic } from "../utils/codingLanguages";
 import ScribblePad from "./ScribblePad";
+import ProctoringPanel from "./ProctoringPanel";
 
 const MotionButton = motion.button;
 
@@ -415,6 +416,7 @@ function Step2Interview({ interviewData, onFinish }) {
             <div className="my-4 h-px bg-gray-200" />
             <div className="grid grid-cols-2 gap-6 text-center"><div><span className="block text-2xl font-bold text-emerald-600">{Math.min(currentIndex + 1, questions.length)}</span><span className="text-xs text-gray-400">Current question</span></div><div><span className="block text-2xl font-bold text-emerald-600">{questions.length}</span><span className="text-xs text-gray-400">Total questions</span></div></div>
           </div>
+          {!isIntroPhase && <ProctoringPanel interviewId={interviewId} questionIndex={currentIndex} active={!isSubmitting} />}
         </aside>
 
         <main className="flex flex-1 flex-col p-5 sm:p-8">
