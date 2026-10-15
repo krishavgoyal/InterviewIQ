@@ -46,12 +46,14 @@ app.use(express.json({ limit: "2mb" }))
 app.use(cookieParser())
 
 const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: "draft-8", legacyHeaders: false });
-const aiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 45, standardHeaders: "draft-8", legacyHeaders: false, message: { message: "Too many AI requests. Please try again shortly." } });
+const aiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 45, standardHeaders: "draft-8", legacyHeaders: false, skip: (req) => req.path === "/proctor-check", message: { message: "Too many AI requests. Please try again shortly." } });
+const proctorLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 75, standardHeaders: "draft-8", legacyHeaders: false, message: { message: "Too many visual integrity checks. Please try again shortly." } });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 app.use("/api", apiLimiter);
 app.use("/api/auth", authLimiter);
+app.use("/api/interview/proctor-check", proctorLimiter);
 app.use("/api/interview", aiLimiter);
 
 app.use("/api/auth" , authRouter)

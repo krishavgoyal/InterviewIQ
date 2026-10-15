@@ -3,7 +3,9 @@ import axios from "axios";
 import { FaCamera, FaCheckCircle, FaExpand, FaExclamationTriangle, FaShieldAlt, FaVideoSlash } from "react-icons/fa";
 import { ServerUrl } from "../config/api";
 
-const AI_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+// Local checks run every 2.5 seconds; this AI-backed image review is the fallback
+// for signals that a browser cannot reliably detect, such as a secondary display.
+const AI_CHECK_INTERVAL_MS = 25 * 1000;
 const LIVE_CHECK_INTERVAL_MS = 2500;
 
 const browserWarningDetails = {
@@ -236,7 +238,7 @@ function ProctoringPanel({ interviewId, questionIndex, active }) {
         };
       });
       setMonitoring(true);
-      setStatus("Camera monitoring is active. Preparing live checks...");
+      setStatus("Camera monitoring is active. Automatic live checks are starting...");
       await sendSignal("camera_started");
       initializeLocalDetectors();
     } catch (cameraError) {
@@ -317,13 +319,13 @@ function ProctoringPanel({ interviewId, questionIndex, active }) {
 
       {monitoring && <div className="mt-3 overflow-hidden rounded-xl bg-slate-900"><video ref={videoRef} muted playsInline className="aspect-video w-full object-cover" /></div>}
 
-      {!monitoring && <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700"><input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} className="mt-0.5 accent-emerald-600" /><span>I consent to camera use during this practice session. Video is not recorded or stored. Local checks inspect only face count and visible phones; periodic still frames are sent to the configured AI service only for the stated observable review signals.</span></label>}
+      {!monitoring && <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700"><input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} className="mt-0.5 accent-emerald-600" /><span>I consent to camera use during this practice session. Video is not recorded or stored. Local checks inspect only face count and visible phones; an optional still-frame review is automatically sent to the configured AI service about every 25 seconds for the stated observable review signals.</span></label>}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {!monitoring ? <button type="button" onClick={startMonitoring} className="flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"><FaCamera /> Start camera monitor</button> : <><button type="button" onClick={runVisualCheck} disabled={isChecking} className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">{isChecking ? "Checking…" : "Run visual check"}</button><button type="button" onClick={enableFocusMode} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"><FaExpand /> Focus mode</button><button type="button" onClick={() => stopMonitoring(true)} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"><FaVideoSlash /> Stop camera</button></>}
+        {!monitoring ? <button type="button" onClick={startMonitoring} className="flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"><FaCamera /> Start camera monitor</button> : <><button type="button" onClick={runVisualCheck} disabled={isChecking} className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">{isChecking ? "Checking…" : "Check now"}</button><button type="button" onClick={enableFocusMode} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"><FaExpand /> Focus mode</button><button type="button" onClick={() => stopMonitoring(true)} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"><FaVideoSlash /> Stop camera</button></>}
       </div>
 
-      {monitoring && <p className="mt-3 text-xs leading-relaxed text-slate-500">{detectionStatus} Eye direction, identity, emotion, and intent are not assessed.</p>}
+      {monitoring && <p className="mt-3 text-xs leading-relaxed text-slate-500">{detectionStatus} AI visual review also runs automatically about every 25 seconds. Eye direction, identity, emotion, and intent are not assessed.</p>}
       <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-slate-600">{reviewCount > 0 ? <FaExclamationTriangle className="mt-0.5 shrink-0 text-amber-500" /> : <FaCheckCircle className="mt-0.5 shrink-0 text-emerald-600" />}<span>{status}{reviewCount > 0 ? ` ${reviewCount} item${reviewCount === 1 ? "" : "s"} marked for review; signals are not an automatic cheating decision.` : ""}</span></p>
       {error && <p className="mt-2 text-xs leading-relaxed text-red-600">{error}</p>}
 
