@@ -355,6 +355,9 @@ const proctorSignalMessages = {
   window_blur: { severity: "review", message: "The interview window lost focus. Review if this was unexpected." },
   focus_mode_exited: { severity: "review", message: "Focus mode was exited during the interview. Review if this was unexpected." },
   camera_stopped: { severity: "review", message: "Camera monitoring stopped before the interview ended. Review if this was unexpected." },
+  no_face: { severity: "review", message: "No face was visible in the camera frame." },
+  multiple_people: { severity: "review", message: "More than one person was visible in the camera frame." },
+  visible_phone: { severity: "review", message: "A phone was visible in the camera frame." },
 };
 
 const normalizeProctorObservations = (result) => {
