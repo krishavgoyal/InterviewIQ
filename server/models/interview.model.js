@@ -14,6 +14,8 @@ const questionsSchema = new mongoose.Schema({
   timeLimit: Number,
   answer: String,
   feedback: String,
+  hints: { type: [String], default: [] },
+  hintsUsed: { type: Number, default: 0 },
   strengths: { type: [String], default: [] },
   improvements: { type: [String], default: [] },
   evaluationSource: { type: String, default: "ai" },

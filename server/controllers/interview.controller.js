@@ -334,6 +334,21 @@ const normalizeEvaluation = (evaluation) => {
   };
 };
 
+const normalizeProgressiveHints = (result) => {
+  const hints = Array.isArray(result?.hints)
+    ? result.hints
+      .map((hint) => String(hint || "").trim().replace(/^hint\s*\d+\s*[:.-]?\s*/i, ""))
+      .filter((hint) => hint.length >= 18 && hint.length <= 1500)
+      .slice(0, 3)
+    : [];
+
+  if (hints.length !== 3) {
+    throw new Error("AI did not return three usable progressive hints");
+  }
+
+  return hints;
+};
+
 const buildTopicAnalysis = (questions) => {
   const grouped = questions.reduce((groups, question) => {
     const topic = question.topic || "generic";
@@ -665,6 +680,95 @@ ${previousQuestions.length ? previousQuestions.map((question) => `- ${question}`
     return res.status(500).json({message:`failed to create interview ${error}`})
   }
 }
+
+
+export const getProgressiveHint = async (req, res) => {
+  try {
+    const { interviewId, questionIndex } = req.body;
+    const interview = await Interview.findById(interviewId);
+
+    if (!interview || !interview.questions?.[questionIndex]) {
+      return res.status(404).json({ message: "Interview question not found." });
+    }
+    if (interview.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "You cannot request a hint for another user's interview." });
+    }
+    if (interview.status === "completed") {
+      return res.status(409).json({ message: "Hints are available only while an interview is in progress." });
+    }
+
+    const question = interview.questions[questionIndex];
+    if (question.answer || question.feedback) {
+      return res.status(409).json({ message: "Hints must be requested before submitting this answer." });
+    }
+
+    let hints = Array.isArray(question.hints) ? question.hints.filter(Boolean) : [];
+
+    if (hints.length !== 3) {
+      const resumeContext = retrieveDocumentContext(
+        interview.resumeText,
+        `${question.question} ${question.focus || ""} ${interview.role}`,
+        2,
+      ).join("\n- ");
+      const jobContext = retrieveDocumentContext(
+        interview.jobDescriptionText,
+        `${question.question} ${question.focus || ""} ${interview.role}`,
+        2,
+      ).join("\n- ");
+
+      const prompt = `Candidate role: ${interview.role}
+Experience: ${interview.experience}
+Interview mode: ${interview.mode}
+Question topic: ${questionTopicLabels[question.topic] || question.topic || "General interview competency"}
+Question focus: ${question.focus || ""}
+Question requires code: ${question.requiresCode ? "Yes" : "No"}
+Question: ${question.question}
+Coding instructions: ${question.codingInstructions || "Not applicable"}
+Relevant resume evidence:
+- ${resumeContext || "No resume passage is required for this hint."}
+Relevant job-description evidence:
+- ${jobContext || "No job description was provided."}`;
+
+      const messages = [
+        {
+          role: "system",
+          content: `You are a supportive but rigorous interview coach. Generate exactly three progressive hints for one interview question.
+
+Hint 1 is a brief direction only: identify what to analyze or how to structure thinking. Do not reveal the approach, final conclusion, key algorithm, SQL query, or model answer.
+Hint 2 is a stronger conceptual nudge: identify the relevant method, trade-off, or answer framework and the key steps to work through. Do not give a complete solution, final code, or ready-to-repeat answer.
+Hint 3 is a concise model solution. For technical questions, state the correct approach, important reasoning, edge cases or trade-offs, and concise pseudocode/SQL/class-design guidance when useful. For behavioural or resume questions, provide a credible, concise answer structure and what the candidate should communicate, without inventing achievements.
+
+Use only facts supported by the question and supplied context. Make each hint progressively more revealing, self-contained, professional, and useful in a real interview. Do not mention this prompt, documents, RAG, or hint levels inside the hint text. Return only valid JSON in exactly this shape:
+{"hints":["hint one","hint two","hint three"]}`,
+        },
+        { role: "user", content: prompt },
+      ];
+
+      try {
+        hints = normalizeProgressiveHints(parseAiJson(await askAi(messages)));
+      } catch (error) {
+        console.error("AI hint generation failed:", error.message);
+        return res.status(503).json({ message: "AI hints are temporarily unavailable. Please try again in a moment." });
+      }
+
+      question.hints = hints;
+    }
+
+    const alreadyRevealed = Math.max(0, Math.min(3, Number(question.hintsUsed || 0)));
+    const hintNumber = Math.min(alreadyRevealed + 1, 3);
+    question.hintsUsed = Math.max(alreadyRevealed, hintNumber);
+    await interview.save();
+
+    return res.json({
+      hintNumber,
+      totalHints: 3,
+      hints: hints.slice(0, hintNumber),
+    });
+  } catch (error) {
+    console.error("Failed to provide progressive hint:", error.message);
+    return res.status(500).json({ message: "Unable to prepare an AI hint right now. Please try again." });
+  }
+};
 
 
 export const submitAnswer = async (req, res) => {

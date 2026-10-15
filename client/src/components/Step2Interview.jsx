@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { BsArrowRight } from "react-icons/bs";
-import { FaMicrophone, FaMicrophoneSlash, FaRegKeyboard } from "react-icons/fa";
+import { FaLightbulb, FaMicrophone, FaMicrophoneSlash, FaRegKeyboard } from "react-icons/fa";
 import { motion } from "motion/react";
 import femaleVideo from "../assets/videos/female-ai.mp4";
 import maleVideo from "../assets/videos/male-ai.mp4";
@@ -34,6 +34,9 @@ function Step2Interview({ interviewData, onFinish }) {
   const [codeLanguage, setCodeLanguage] = useState(() => defaultLanguageForTopic(questions[0]?.topic));
   const [codeVersion, setCodeVersion] = useState(() => codingLanguages.find((item) => item.id === defaultLanguageForTopic(questions[0]?.topic))?.versions[0] || "Structured");
   const [scribbleImage, setScribbleImage] = useState("");
+  const [hints, setHints] = useState(() => Array.isArray(questions[0]?.hints) ? questions[0].hints : []);
+  const [isLoadingHint, setIsLoadingHint] = useState(false);
+  const [hintError, setHintError] = useState("");
 
   const videoRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -300,6 +303,36 @@ function Step2Interview({ interviewData, onFinish }) {
     }
   };
 
+  const requestHint = async () => {
+    if (isLoadingHint || isSubmitting || !currentQuestion || hints.length >= 3) return;
+
+    setQuestionActive(false);
+    stopListening(false);
+    setIsLoadingHint(true);
+    setHintError("");
+
+    try {
+      const result = await axios.post(`${ServerUrl}/api/interview/hint`, {
+        interviewId,
+        questionIndex: currentIndex,
+      }, { withCredentials: true });
+      const revealedHints = Array.isArray(result.data?.hints) ? result.data.hints : [];
+      const newestHint = revealedHints[revealedHints.length - 1];
+
+      setHints(revealedHints);
+      setSubtitle(`AI hint ${result.data.hintNumber} of ${result.data.totalHints} is ready.`);
+      if (newestHint) await speakText(newestHint);
+    } catch (requestError) {
+      setHintError(requestError.response?.data?.message || "The AI hint could not be prepared. Please try again.");
+    } finally {
+      setIsLoadingHint(false);
+      if (!feedback) {
+        setQuestionActive(true);
+        if (micEnabledRef.current) startListening();
+      }
+    }
+  };
+
   useEffect(() => {
     if (questionActive && timeLeft === 0 && !feedback && !isSubmitting) {
       const submissionTimer = window.setTimeout(submitAnswer, 0);
@@ -333,6 +366,8 @@ function Step2Interview({ interviewData, onFinish }) {
     setSubtitle("");
     setCode("");
     setScribbleImage("");
+    setHints([]);
+    setHintError("");
 
     if (currentIndex + 1 >= questions.length) {
       finishInterview();
@@ -343,6 +378,7 @@ function Step2Interview({ interviewData, onFinish }) {
     setCode(nextQuestion.requiresCode ? nextQuestion.starterCode || "" : "");
     setCodeLanguage(nextLanguage);
     setCodeVersion(codingLanguages.find((item) => item.id === nextLanguage)?.versions[0] || "Structured");
+    setHints(Array.isArray(nextQuestion.hints) ? nextQuestion.hints : []);
     setCurrentIndex((previous) => previous + 1);
   };
 
@@ -386,6 +422,8 @@ function Step2Interview({ interviewData, onFinish }) {
           <p className="mt-1 text-sm text-gray-500">Speak naturally. Your final spoken words appear below and are sent to the AI evaluator.</p>
 
           {!isIntroPhase && currentQuestion && <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-5 shadow-sm"><div className="mb-2 flex flex-wrap items-center gap-2"><p className="text-xs text-gray-400">Question {currentIndex + 1} of {questions.length}</p>{currentQuestion.topic && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">{currentQuestion.topic.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase())}</span>}{currentQuestion.requiresCode && <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">Code or pseudocode required</span>}</div><p className="text-base font-semibold leading-relaxed text-gray-800 sm:text-lg">{currentQuestion.question}</p>{currentQuestion.focus && <p className="mt-3 text-xs leading-relaxed text-gray-500">Focus: {currentQuestion.focus}</p>}</div>}
+
+          {!feedback && !isIntroPhase && currentQuestion && <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><div className="flex items-center gap-2"><FaLightbulb className="text-amber-500" /><p className="font-semibold text-amber-950">Progressive AI hints</p></div><p className="mt-1 text-xs leading-relaxed text-amber-800">Hint 1 gives direction, Hint 2 gives the approach, and Hint 3 reveals a concise model answer. The timer pauses while a hint is prepared.</p></div><span className="w-fit rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">{hints.length}/3 used</span></div>{hints.length > 0 && <div className="mt-4 space-y-3">{hints.map((hint, index) => <article key={`${currentIndex}-${index}`} className={`rounded-xl border p-3 ${index === 2 ? "border-rose-200 bg-rose-50" : "border-amber-200 bg-white/80"}`}><p className={`text-xs font-bold uppercase tracking-wide ${index === 2 ? "text-rose-700" : "text-amber-700"}`}>{index === 2 ? "Hint 3 · Concise model answer" : `Hint ${index + 1} · ${index === 0 ? "Direction" : "Approach"}`}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{hint}</p></article>)}</div>}{hints.length < 3 && <button type="button" onClick={requestHint} disabled={isLoadingHint || !questionActive} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-3 text-sm font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"><FaLightbulb />{isLoadingHint ? "AI is preparing your hint..." : hints.length === 0 ? "Ask for hint 1 · Direction" : hints.length === 1 ? "Ask for hint 2 · Approach" : "Reveal hint 3 · Model answer"}</button>}{hintError && <p className="mt-3 text-sm text-red-600">{hintError}</p>}</section>}
 
           {subtitle && <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-800">{subtitle}</div>}
 
