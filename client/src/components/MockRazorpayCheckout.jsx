@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   FaArrowRight,
   FaBuildingColumns,
-  FaChevronRight,
   FaCreditCard,
   FaEllipsisVertical,
   FaLock,
@@ -16,7 +15,6 @@ import {
   SiMastercard,
   SiPaytm,
   SiPhonepe,
-  SiRazorpay,
   SiVisa,
 } from "react-icons/si";
 import axios from "axios";
@@ -113,19 +111,19 @@ function MockRazorpayCheckout({ order, plan, onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#20242b]/90 p-3 font-sans sm:p-6" role="dialog" aria-modal="true" aria-label="Razorpay test checkout">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#20242b]/90 p-3 font-sans sm:p-6" role="dialog" aria-modal="true" aria-label="InterviewIQ demo checkout">
       <form onSubmit={handleDemoPayment} className="grid max-h-[96vh] w-full max-w-245 overflow-y-auto rounded-3xl border border-white/10 bg-white shadow-[0_30px_90px_rgba(0,0,0,0.48)] md:max-h-130 md:grid-cols-[31%_69%] md:overflow-hidden">
         <aside className="relative min-h-62 overflow-hidden bg-[#56a9d4] p-5 text-white md:min-h-130 md:p-6">
-          <div className="relative z-10 flex items-center gap-2 text-sm font-medium"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#3c9dcc] shadow-sm"><SiRazorpay size={18} /></div><span className="max-w-40 truncate">InterviewIQ.AI</span></div>
-          <p className="relative z-10 mt-1 text-[10px] font-semibold text-emerald-50">✓ Razorpay Trusted Business</p>
+          <div className="relative z-10 flex items-center gap-2 text-sm font-medium"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#3c9dcc] shadow-sm"><FaWallet size={15} /></div><span className="max-w-40 truncate">InterviewIQ.AI</span></div>
+          <p className="relative z-10 mt-1 text-[10px] font-semibold text-emerald-50">✓ Simulated checkout · no real charge</p>
           <div className="relative z-10 mt-5 rounded-lg bg-white p-3 text-slate-700 shadow-sm"><p className="text-[11px] text-slate-500">Price Summary</p><p className="mt-1 text-xl font-bold">{amount}</p><p className="mt-1 text-[10px] text-slate-400">{plan.credits} interview credits</p></div>
-          <button type="button" className="relative z-10 mt-3 flex w-full items-center justify-between rounded-lg bg-white/95 px-3 py-3 text-left text-[11px] font-medium text-slate-600 shadow-sm"><span>Using +91 98563 21472</span><FaChevronRight className="text-slate-400" /></button>
-          <div className="absolute -bottom-20 -left-8 h-52 w-120 rotate-[-20deg] rounded-[50%] bg-[#4297c4] opacity-90" /><div className="absolute bottom-5 left-5 flex items-center gap-1 text-[10px] text-white/90"><FaLock size={9} /> Secured by <span className="font-bold italic">Razorpay</span></div>
+          <div className="relative z-10 mt-3 rounded-lg bg-white/95 px-3 py-3 text-[11px] font-medium text-slate-600 shadow-sm">Demo credit top-up</div>
+          <div className="absolute -bottom-20 -left-8 h-52 w-120 rotate-[-20deg] rounded-[50%] bg-[#4297c4] opacity-90" /><div className="absolute bottom-5 left-5 flex items-center gap-1 text-[10px] text-white/90"><FaLock size={9} /> No bank, card, or UPI data is collected</div>
         </aside>
 
-        <section className="bg-white text-slate-700"><header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 md:px-6"><p className="text-sm font-semibold text-slate-600">Payment Options</p><div className="flex items-center gap-4 text-slate-400"><FaEllipsisVertical /><button type="button" onClick={onClose} disabled={processing} aria-label="Close checkout" className="transition hover:text-slate-700 disabled:opacity-50"><FaXmark size={18} /></button></div></header>
+        <section className="bg-white text-slate-700"><header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 md:px-6"><div><p className="text-sm font-semibold text-slate-600">Demo payment options</p><p className="mt-0.5 text-[10px] text-slate-400">For portfolio demonstration only</p></div><div className="flex items-center gap-4 text-slate-400"><FaEllipsisVertical /><button type="button" onClick={onClose} disabled={processing} aria-label="Close checkout" className="transition hover:text-slate-700 disabled:opacity-50"><FaXmark size={18} /></button></div></header>
           <div className="grid min-h-108 sm:grid-cols-[36%_64%]"><nav className="border-b border-slate-100 bg-[#f8fafc] py-2 sm:border-b-0 sm:border-r"><div className="flex overflow-x-auto sm:block">{paymentMethods.map((item) => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => setPaymentMethod(item.id)} className={`flex min-w-30 items-center justify-between gap-2 px-4 py-3 text-left text-xs transition sm:w-full ${method === item.id ? "bg-[#eef6fe] font-semibold text-slate-700" : "text-slate-600 hover:bg-slate-100"}`}><span className="flex items-center gap-2"><Icon className={method === item.id ? "text-[#4d9fd0]" : "text-slate-400"} />{item.label}</span><PaymentMarks marks={item.marks} /></button>; })}</div></nav>
-            <main className="p-5 md:p-6">{paymentContent()}{error && <p className="mt-4 text-xs text-red-600">{error}</p>}<button disabled={processing} className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-linear-to-b from-[#252d32] to-[#070a0c] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"><FaLock size={11} />{processing ? "Processing test payment..." : `Verify and Pay ${amount}`}</button><p className="mt-3 text-center text-[10px] text-slate-400">This is a local test checkout. No payment is collected.</p></main>
+            <main className="p-5 md:p-6">{paymentContent()}{error && <p className="mt-4 text-xs text-red-600">{error}</p>}<button disabled={processing} className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-linear-to-b from-[#252d32] to-[#070a0c] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"><FaLock size={11} />{processing ? "Adding demo credits..." : `Simulate payment ${amount}`}</button><p className="mt-3 text-center text-[10px] text-slate-400">Demo only: no money is charged and no payment details are collected.</p></main>
           </div>
         </section>
       </form>

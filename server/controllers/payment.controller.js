@@ -4,13 +4,18 @@ import razorpay from "../services/razorpay.service.js";
 import crypto from "crypto"
 import { getPlan } from "../config/plans.js";
 
+const demoPaymentsEnabled = () => (
+  process.env.PAYMENT_MODE === "demo"
+  && (process.env.NODE_ENV !== "production" || process.env.ALLOW_DEMO_PAYMENTS === "true")
+);
+
 export const createOrder = async (req,res) => {
     try {
         const { planId } = req.body;
         const plan = getPlan(planId);
         if (!plan) return res.status(400).json({ message: "Invalid plan." });
 
-    const demoMode = process.env.PAYMENT_MODE === "demo" && process.env.NODE_ENV !== "production";
+    const demoMode = demoPaymentsEnabled();
     if (demoMode) {
       const demoOrderId = `order_demo_${Date.now()}`;
 
@@ -77,7 +82,7 @@ export const verifyPayment = async (req,res) => {
       return res.status(404).json({ message: "Payment not found" });
     }
 
-    const demoMode = process.env.PAYMENT_MODE === "demo" && process.env.NODE_ENV !== "production";
+    const demoMode = demoPaymentsEnabled();
     if (demoMode && razorpay_order_id?.startsWith("order_demo_")) {
       const claimedPayment = await Payment.findOneAndUpdate(
         { _id: payment._id, status: "created" },

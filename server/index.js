@@ -22,7 +22,14 @@ if (process.env.NODE_ENV === "production") {
   const required = ["MONGODB_URL", "JWT_SECRET", "CLIENT_URLS", "FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY"];
   const missing = required.filter((name) => !process.env[name]);
   if (missing.length) throw new Error(`Missing required production environment variables: ${missing.join(", ")}`);
-  if (process.env.PAYMENT_MODE === "demo") throw new Error("Demo payments cannot run in production.");
+  const paymentMode = process.env.PAYMENT_MODE || "demo";
+  if (!["demo", "razorpay"].includes(paymentMode)) throw new Error("PAYMENT_MODE must be either demo or razorpay.");
+  if (paymentMode === "demo" && process.env.ALLOW_DEMO_PAYMENTS !== "true") {
+    throw new Error("Set ALLOW_DEMO_PAYMENTS=true to explicitly enable simulated payments in production.");
+  }
+  if (paymentMode === "razorpay" && (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET)) {
+    throw new Error("Razorpay mode requires RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
+  }
 }
 
 app.disable("x-powered-by");

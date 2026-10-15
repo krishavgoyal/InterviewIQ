@@ -142,7 +142,7 @@ function Pricing() {
             Choose Your Plan
           </h1>
           <p className="text-gray-500 mt-3 text-lg">
-            Flexible pricing to match your interview preparation goals.
+            Demo credit packs for practising the complete InterviewIQ experience.
           </p>
         </div>
       </div>
@@ -230,7 +230,7 @@ function Pricing() {
                   {loadingPlan === plan.id
                     ? "Processing..."
                     : isSelected
-                      ? "Proceed to Pay"
+                      ? "Open demo checkout"
                       : "Select Plan"}
 
                 </button>
@@ -248,7 +248,7 @@ function Pricing() {
           onSuccess={(user) => {
             dispatch(setUserData(user));
             setDemoCheckout(null);
-            alert("Test payment successful. Credits added!");
+            alert("Demo payment completed. Credits added!");
             navigate("/");
           }}
         />
