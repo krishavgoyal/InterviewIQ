@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+server/public/
+coverage/
+npm-debug.log*
+
+backup-*/
